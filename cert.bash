@@ -1,13 +1,20 @@
 #!/bin/bash
 
-rm -R certificates
-mkdir -p certificates/
-
 # reads the acme.json file
-json=$(cat acme.json)
+json=$(cat /app/acme.json)
 array=()
 star_array=()
 wildcard=$(echo "$json" | jq -r '.[].Certificates[].domain.main' | grep '*')
+folder_cert=/app/certificates
+
+if [ -d "$folder_cert" ]; then
+  echo "$folder_cert directory exists."
+  rm -R $folder_cert && echo "Old $folder_cert is removed"
+else
+  echo "$folder_cert directory does not exist."
+fi
+
+mkdir -p $folder_cert && echo "$folder_cert is created"
 
 # generer les certs et keys
 export_cer_key() {
@@ -56,9 +63,12 @@ if [[ $wildcard ]]; then
   for domain in $(echo "$json" | jq -r '.[].Certificates[].domain.main' | grep '*'); do
     remove_old_cert "$domain"
   done
-  docker restart traefik
+  docker restart traefik >> /dev/null
   echo 'regenerate new certificates, Please wait!'
-  waiting 30
+  sleep 7 &
+  PID=$!
+  waiting 10
+  wait $PID
 
   for domain in $(echo "$json" | jq -r '.[].Certificates[].domain.main' | grep '*'); do
     star="${domain/'*.'/star_}"
